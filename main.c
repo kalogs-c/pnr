@@ -1,10 +1,14 @@
 #include "mpc.h"
 #include <editline/readline.h>
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define TRUE 1
-#define FALSE 0
+#define DEBUG
+
+long evaluate(mpc_ast_t *ast);
+long evaluate_op(char *op, long left, long right);
 
 int main() {
   mpc_parser_t *Number = mpc_new("number");
@@ -14,7 +18,7 @@ int main() {
 
   mpca_lang(MPCA_LANG_DEFAULT,
             " number : /-?[0-9]+(\\.[0-9]+)?/ ; "
-            " operator : '+' | '-' | '*' | '/' | '%' ;            "
+            " operator : '+' | '-' | '*' | '/' | '%' | '^' ;            "
             " expr     : <number> | '(' <operator> <expr>+ ')' ;  "
             " lispy    : /^/ <operator> <expr>+ /$/ ;             ",
             Number, Operator, Expr, Lispy);
@@ -22,13 +26,15 @@ int main() {
   puts("Lispy Version 0.0.1");
   puts("Press Ctrl+C to exit\n");
 
-  while (TRUE) {
-    char *input = readline("Lispy>");
+  while (true) {
+    char *input = readline("Lispy> ");
     add_history(input);
 
     mpc_result_t result;
     if (mpc_parse("<stdin>", input, Lispy, &result)) {
-      mpc_ast_print(result.output);
+      long output = evaluate(result.output);
+      printf("%li\n", output);
+
       mpc_ast_delete(result.output);
     } else {
       mpc_err_print(result.error);
@@ -39,5 +45,49 @@ int main() {
   }
 
   mpc_cleanup(4, Number, Operator, Expr, Lispy);
+  return 0;
+}
+
+long evaluate(mpc_ast_t *t) {
+#ifdef DEBUG
+  mpc_ast_print(t);
+#endif /* ifdef DEBUG */
+
+  if (strstr(t->tag, "number")) {
+    return atoi(t->contents);
+  }
+
+  char *op = t->children[1]->contents;
+
+  long accumulator = evaluate(t->children[2]);
+
+  int i = 3;
+  while (strstr(t->children[i]->tag, "expr")) {
+    accumulator = evaluate_op(op, accumulator, evaluate(t->children[i]));
+    i++;
+  }
+
+  return accumulator;
+}
+
+long evaluate_op(char *op, long left, long right) {
+  if (strcmp(op, "+") == 0)
+    return left + right;
+
+  if (strcmp(op, "-") == 0)
+    return left - right;
+
+  if (strcmp(op, "*") == 0)
+    return left * right;
+
+  if (strcmp(op, "/") == 0)
+    return left / right;
+
+  if (strcmp(op, "%") == 0)
+    return left % right;
+
+  if (strcmp(op, "^") == 0)
+    return pow(left, right);
+
   return 0;
 }
