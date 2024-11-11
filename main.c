@@ -1,3 +1,4 @@
+#include "lval.h"
 #include "mpc.h"
 #include <editline/readline.h>
 #include <math.h>
@@ -7,8 +8,67 @@
 
 #define DEBUG
 
-long evaluate(mpc_ast_t *ast);
-long evaluate_op(char *op, long left, long right);
+lval_t evaluate_op(char *op, lval_t left, lval_t right) {
+  if (left.type == LVAL_ERR)
+    return left;
+
+  if (right.type == LVAL_ERR)
+    return right;
+
+  if (strcmp(op, "+") == 0)
+    return lval_num(left.value.num + right.value.num);
+
+  if (strcmp(op, "-") == 0)
+    return lval_num(left.value.num - right.value.num);
+
+  if (strcmp(op, "*") == 0)
+    return lval_num(left.value.num * right.value.num);
+
+  if (strcmp(op, "/") == 0) {
+    if (right.value.num == 0) {
+      return lval_err(LERR_DIV_ZERO);
+    }
+
+    return lval_num(left.value.num / right.value.num);
+  }
+
+  if (strcmp(op, "%") == 0) {
+    if (right.value.num == 0) {
+      return lval_err(LERR_DIV_ZERO);
+    }
+
+    return lval_num(left.value.num % right.value.num);
+  }
+
+  if (strcmp(op, "^") == 0)
+    return lval_num(pow(left.value.num, right.value.num));
+
+  return lval_err(LERR_BAD_OP);
+}
+
+lval_t evaluate(mpc_ast_t *t) {
+#ifdef DEBUG
+  mpc_ast_print(t);
+#endif /* ifdef DEBUG */
+
+  if (strstr(t->tag, "number")) {
+    errno = 0;
+    long number = strtol(t->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(number) : lval_err(LERR_BAD_NUM);
+  }
+
+  char *op = t->children[1]->contents;
+
+  lval_t accumulator = evaluate(t->children[2]);
+
+  int i = 3;
+  while (strstr(t->children[i]->tag, "expr")) {
+    accumulator = evaluate_op(op, accumulator, evaluate(t->children[i]));
+    i++;
+  }
+
+  return accumulator;
+}
 
 int main() {
   mpc_parser_t *Number = mpc_new("number");
@@ -32,8 +92,8 @@ int main() {
 
     mpc_result_t result;
     if (mpc_parse("<stdin>", input, Lispy, &result)) {
-      long output = evaluate(result.output);
-      printf("%li\n", output);
+      lval_t output = evaluate(result.output);
+      lval_println(&output);
 
       mpc_ast_delete(result.output);
     } else {
@@ -45,49 +105,5 @@ int main() {
   }
 
   mpc_cleanup(4, Number, Operator, Expr, Lispy);
-  return 0;
-}
-
-long evaluate(mpc_ast_t *t) {
-#ifdef DEBUG
-  mpc_ast_print(t);
-#endif /* ifdef DEBUG */
-
-  if (strstr(t->tag, "number")) {
-    return atoi(t->contents);
-  }
-
-  char *op = t->children[1]->contents;
-
-  long accumulator = evaluate(t->children[2]);
-
-  int i = 3;
-  while (strstr(t->children[i]->tag, "expr")) {
-    accumulator = evaluate_op(op, accumulator, evaluate(t->children[i]));
-    i++;
-  }
-
-  return accumulator;
-}
-
-long evaluate_op(char *op, long left, long right) {
-  if (strcmp(op, "+") == 0)
-    return left + right;
-
-  if (strcmp(op, "-") == 0)
-    return left - right;
-
-  if (strcmp(op, "*") == 0)
-    return left * right;
-
-  if (strcmp(op, "/") == 0)
-    return left / right;
-
-  if (strcmp(op, "%") == 0)
-    return left % right;
-
-  if (strcmp(op, "^") == 0)
-    return pow(left, right);
-
   return 0;
 }

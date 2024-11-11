@@ -5,7 +5,7 @@ CC = clang
 DBG = lldb
 
 build-main: build-dir ## Build main
-	$(CC) -Wall -O3 -g -o build/main -ledit -lm main.c mpc.c
+	$(CC) -Wall -O3 -g -o build/main -ledit -lm main.c mpc.c lval.c
 
 check: ## Check prerequisites (compiler and debugger)
 	@which $(CC) > /dev/null && echo "SUCCESS: $(CC) is installed" || echo "ERROR: $(CC) not found, please install clang"
