@@ -1,5 +1,6 @@
 #include "lval.h"
 #include "mpc.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -211,6 +212,10 @@ lval_t* builtin_op(lval_t* v, char* op) {
       x->value.num *= y->value.num;
     }
 
+    if (strcmp(op, "^") == 0) {
+      x->value.num = pow(x->value.num, y->value.num);
+    }
+
     if (strcmp(op, "/") == 0) {
       if (y->value.num == 0) {
         lval_destroy(x);
@@ -219,6 +224,16 @@ lval_t* builtin_op(lval_t* v, char* op) {
         break;
       }
       x->value.num /= y->value.num;
+    }
+
+    if (strcmp(op, "%") == 0) {
+      if (y->value.num == 0) {
+        lval_destroy(x);
+        lval_destroy(y);
+        x = lval_err("division by zero!");
+        break;
+      }
+      x->value.num = x->value.num % y->value.num;
     }
 
     lval_destroy(y);
