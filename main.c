@@ -7,20 +7,36 @@
 
 #define DEBUG
 
+void debugp(mpc_result_t* t) {
+#ifdef DEBUG
+  putchar('\n');
+  puts("## AST DEBUG ##");
+  mpc_ast_print(t->output);
+  puts("## DEBUG AST ##");
+  putchar('\n');
+#endif /* ifdef DEBUG */
+}
+
 int main() {
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
   mpc_parser_t* Expr = mpc_new("expr");
   mpc_parser_t* SExpr = mpc_new("sexpr");
+  mpc_parser_t* QExpr = mpc_new("qexpr");
   mpc_parser_t* PNR = mpc_new("lispy");
 
-  mpca_lang(MPCA_LANG_DEFAULT,
-            " number : /-?[0-9]+(\\.[0-9]+)?/ ;                 "
-            " symbol : '+' | '-' | '*' | '/' | '%' | '^' ;      "
-            " sexpr    : '(' <expr>* ')' ;                      "
-            " expr     : <number> | <symbol> | <sexpr> ;        "
-            " lispy    : /^/ <expr>* /$/ ;             ",
-            Number, Symbol, SExpr, Expr, PNR);
+  mpca_lang(
+      MPCA_LANG_DEFAULT,
+      " number : /-?[0-9]+(\\.[0-9]+)?/ ;                                "
+      " symbol : '+' | '-' | '*' | '/' | '%' | '^'                       "
+      "        | \"list\" | \"head\" | \"tail\"                          "
+      "        | \"cons\" | \"len\" | \"init\"                           "
+      "        | \"join\" | \"eval\" ;                                   "
+      " sexpr  : '(' <expr>* ')' ;                                       "
+      " qexpr  : '{' <expr>* '}' ;                                       "
+      " expr   : <number> | <symbol> | <sexpr> | <qexpr> ;               "
+      " lispy  : /^/ <expr>* /$/ ;                                       ",
+      Number, Symbol, SExpr, QExpr, Expr, PNR);
 
   puts("PNR Version 0.0.1");
   puts("Press Ctrl+C to exit\n");
@@ -31,7 +47,8 @@ int main() {
 
     mpc_result_t result;
     if (mpc_parse("<stdin>", input, PNR, &result)) {
-      /*lval_t output = evaluate(result.output);*/
+      debugp(&result);
+
       lval_t* output = lval_eval(lval_read(result.output));
       lval_println(output);
       lval_destroy(output);
@@ -45,6 +62,6 @@ int main() {
     free(input);
   }
 
-  mpc_cleanup(4, Number, Symbol, SExpr, Expr, PNR);
+  mpc_cleanup(6, Number, Symbol, SExpr, QExpr, Expr, PNR);
   return 0;
 }

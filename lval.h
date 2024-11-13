@@ -8,6 +8,7 @@ typedef enum LTypes {
   LVAL_ERR,
   LVAL_SYM,
   LVAL_SEXPR,
+  LVAL_QEXPR,
 } lval_type_t;
 
 typedef enum LErrors {
@@ -16,16 +17,16 @@ typedef enum LErrors {
   LERR_BAD_NUM,
 } lerr_t;
 
-typedef struct lsexpr_t {
+typedef struct lcellw_t {
   int count;
   struct lval_t** cell;
-} lsexpr_t;
+} lcellw_t;
 
 typedef union LResult {
   long num;
   char* err;
   char* sym;
-  lsexpr_t sexpr;
+  lcellw_t cellw;
 } lresult_t;
 
 typedef struct lval_t {
@@ -37,6 +38,7 @@ lval_t* lval_num(long num);
 lval_t* lval_err(char* err);
 lval_t* lval_sym(char* sym);
 lval_t* lval_sexpr();
+lval_t* lval_qexpr();
 
 void lval_destroy(lval_t* v);
 
@@ -48,6 +50,7 @@ void lval_print(lval_t* v);
 void lval_println(lval_t* v);
 void lval_expr_print(lval_t* v, char open, char close);
 
+lval_t* builtin(lval_t* v, char* fun);
 lval_t* lval_pop(lval_t* v, int i);
 lval_t* lval_take(lval_t* v, int i);
 lval_t* lval_eval(lval_t* v);
