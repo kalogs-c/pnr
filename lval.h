@@ -3,35 +3,35 @@
 
 #include "mpc.h"
 
-typedef enum LTypes {
+// Forward declaration
+typedef struct lval_t lval_t;
+typedef struct lenv_t lenv_t;
+
+typedef enum {
   LVAL_NUM,
   LVAL_ERR,
   LVAL_SYM,
   LVAL_SEXPR,
   LVAL_QEXPR,
-} lval_type_t;
+  LVAL_FUN,
+} type_t;
 
-typedef enum LErrors {
-  LERR_DIV_ZERO,
-  LERR_BAD_OP,
-  LERR_BAD_NUM,
-} lerr_t;
-
-typedef struct lcellw_t {
+typedef struct {
   int count;
-  struct lval_t** cell;
-} lcellw_t;
+  lval_t** values;
+} lcell_t;
 
-typedef union LResult {
-  long num;
-  char* err;
-  char* sym;
-  lcellw_t cellw;
-} lresult_t;
+typedef lval_t* (*lbuiltin_t)(lenv_t*, lval_t*);
 
 typedef struct lval_t {
-  lval_type_t type;
-  lresult_t value;
+  type_t type;
+  union {
+    long number;
+    char* error;
+    char* symbol;
+    lcell_t cell;
+    lbuiltin_t function;
+  } value;
 } lval_t;
 
 lval_t* lval_num(long num);
@@ -55,5 +55,6 @@ lval_t* lval_pop(lval_t* v, int i);
 lval_t* lval_take(lval_t* v, int i);
 lval_t* lval_eval(lval_t* v);
 lval_t* lval_eval_sexpr(lval_t* v);
+lval_t* lval_copy(lval_t* v);
 
 #endif // !LVAL_H

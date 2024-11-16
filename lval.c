@@ -8,7 +8,7 @@
 lval_t* lval_num(long num) {
   lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
   lval->type = LVAL_NUM;
-  lval->value.num = num;
+  lval->value.number = num;
 
   return lval;
 }
@@ -16,8 +16,8 @@ lval_t* lval_num(long num) {
 lval_t* lval_err(char* err) {
   lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
   lval->type = LVAL_ERR;
-  lval->value.err = (char*)malloc(strlen(err) + 1);
-  strcpy(lval->value.err, err);
+  lval->value.error = (char*)malloc(strlen(err) + 1);
+  strcpy(lval->value.error, err);
 
   return lval;
 }
@@ -25,8 +25,8 @@ lval_t* lval_err(char* err) {
 lval_t* lval_sym(char* sym) {
   lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
   lval->type = LVAL_SYM;
-  lval->value.sym = (char*)malloc(strlen(sym) + 1);
-  strcpy(lval->value.sym, sym);
+  lval->value.symbol = (char*)malloc(strlen(sym) + 1);
+  strcpy(lval->value.symbol, sym);
 
   return lval;
 }
@@ -34,8 +34,8 @@ lval_t* lval_sym(char* sym) {
 lval_t* lval_sexpr() {
   lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
   lval->type = LVAL_SEXPR;
-  lval->value.cellw.count = 0;
-  lval->value.cellw.cell = NULL;
+  lval->value.cell.count = 0;
+  lval->value.cell.values = NULL;
 
   return lval;
 }
@@ -43,30 +43,39 @@ lval_t* lval_sexpr() {
 lval_t* lval_qexpr() {
   lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
   lval->type = LVAL_QEXPR;
-  lval->value.cellw.count = 0;
-  lval->value.cellw.cell = NULL;
+  lval->value.cell.count = 0;
+  lval->value.cell.values = NULL;
+
+  return lval;
+}
+
+lval_t* lval_fun(lbuiltin_t fun) {
+  lval_t* lval = (lval_t*)malloc(sizeof(lval_t));
+  lval->type = LVAL_FUN;
+  lval->value.function = fun;
 
   return lval;
 }
 
 void lval_destroy(lval_t* v) {
   switch (v->type) {
+  case LVAL_FUN:
   case LVAL_NUM:
     break;
 
   case LVAL_ERR:
-    free(v->value.err);
+    free(v->value.error);
     break;
   case LVAL_SYM:
-    free(v->value.sym);
+    free(v->value.symbol);
     break;
 
   case LVAL_SEXPR:
   case LVAL_QEXPR:
-    for (int i = 0; i < v->value.cellw.count; i++) {
-      lval_destroy(v->value.cellw.cell[i]);
+    for (int i = 0; i < v->value.cell.count; i++) {
+      lval_destroy(v->value.cell.values[i]);
     }
-    free(v->value.cellw.cell);
+    free(v->value.cell.values);
     break;
   }
 
@@ -74,24 +83,24 @@ void lval_destroy(lval_t* v) {
 }
 
 lval_t* lval_add(lval_t* v, lval_t* x) {
-  v->value.cellw.count++;
-  v->value.cellw.cell =
-      realloc(v->value.cellw.cell, sizeof(lval_t*) * v->value.cellw.count);
-  v->value.cellw.cell[v->value.cellw.count - 1] = x;
+  v->value.cell.count++;
+  v->value.cell.values =
+      realloc(v->value.cell.values, sizeof(lval_t*) * v->value.cell.count);
+  v->value.cell.values[v->value.cell.count - 1] = x;
   return v;
 }
 
 lval_t* lval_prepend(lval_t* v, lval_t* x) {
-  v->value.cellw.count++;
-  v->value.cellw.cell =
-      realloc(v->value.cellw.cell, sizeof(lval_t*) * v->value.cellw.count);
+  v->value.cell.count++;
+  v->value.cell.values =
+      realloc(v->value.cell.values, sizeof(lval_t*) * v->value.cell.count);
 
   // Shift
-  for (int i = v->value.cellw.count - 1; i > 0; i--) {
-    v->value.cellw.cell[i] = v->value.cellw.cell[i - 1];
+  for (int i = v->value.cell.count - 1; i > 0; i--) {
+    v->value.cell.values[i] = v->value.cell.values[i - 1];
   }
 
-  v->value.cellw.cell[0] = x;
+  v->value.cell.values[0] = x;
 
   return v;
 }
@@ -146,10 +155,10 @@ lval_t* lval_read(mpc_ast_t* t) {
 void lval_expr_print(lval_t* v, char open, char close) {
   putchar(open);
 
-  for (int i = 0; i < v->value.cellw.count; i++) {
-    lval_print(v->value.cellw.cell[i]);
+  for (int i = 0; i < v->value.cell.count; i++) {
+    lval_print(v->value.cell.values[i]);
 
-    if (i != v->value.cellw.count - 1) {
+    if (i != v->value.cell.count - 1) {
       putchar(' ');
     }
   }
@@ -160,15 +169,15 @@ void lval_expr_print(lval_t* v, char open, char close) {
 void lval_print(lval_t* v) {
   switch (v->type) {
   case LVAL_NUM:
-    printf("%ld", v->value.num);
+    printf("%ld", v->value.number);
     break;
 
   case LVAL_ERR:
-    printf("#<error: %s>", v->value.err);
+    printf("#<error: %s>", v->value.error);
     break;
 
   case LVAL_SYM:
-    printf("%s", v->value.sym);
+    printf("%s", v->value.symbol);
     break;
 
   case LVAL_SEXPR:
@@ -177,6 +186,10 @@ void lval_print(lval_t* v) {
 
   case LVAL_QEXPR:
     lval_expr_print(v, '{', '}');
+    break;
+
+  case LVAL_FUN:
+    printf("<function>");
     break;
   }
 }
@@ -187,15 +200,15 @@ void lval_println(lval_t* v) {
 }
 
 lval_t* lval_pop(lval_t* v, int i) {
-  lval_t* x = v->value.cellw.cell[i];
+  lval_t* x = v->value.cell.values[i];
 
-  memmove(&v->value.cellw.cell[i], &v->value.cellw.cell[i + 1],
-          sizeof(lval_t*) * (v->value.cellw.count - i - 1));
+  memmove(&v->value.cell.values[i], &v->value.cell.values[i + 1],
+          sizeof(lval_t*) * (v->value.cell.count - i - 1));
 
-  v->value.cellw.count--;
+  v->value.cell.count--;
 
-  v->value.cellw.cell =
-      realloc(v->value.cellw.cell, sizeof(lval_t*) * v->value.cellw.count);
+  v->value.cell.values =
+      realloc(v->value.cell.values, sizeof(lval_t*) * v->value.cell.count);
 
   return x;
 }
@@ -216,8 +229,8 @@ lval_t* lval_eval(lval_t* v) {
 
 lval_t* builtin_op(lval_t* v, char* op) {
   // Ensure all arguments are numbers
-  for (int i = 0; i < v->value.cellw.count; i++) {
-    if (v->value.cellw.cell[i]->type != LVAL_NUM) {
+  for (int i = 0; i < v->value.cell.count; i++) {
+    if (v->value.cell.values[i]->type != LVAL_NUM) {
       lval_destroy(v);
       return lval_err(
           "arguments must be numbers, cannot operate on non-numbers!");
@@ -226,47 +239,47 @@ lval_t* builtin_op(lval_t* v, char* op) {
 
   lval_t* x = lval_pop(v, 0);
 
-  if (strcmp(op, "-") == 0 && v->value.cellw.count == 0) {
-    x->value.num = -x->value.num;
+  if (strcmp(op, "-") == 0 && v->value.cell.count == 0) {
+    x->value.number = -x->value.number;
   }
 
-  while (v->value.cellw.count > 0) {
+  while (v->value.cell.count > 0) {
     lval_t* y = lval_pop(v, 0);
 
     if (strcmp(op, "+") == 0) {
-      x->value.num += y->value.num;
+      x->value.number += y->value.number;
     }
 
     if (strcmp(op, "-") == 0) {
-      x->value.num -= y->value.num;
+      x->value.number -= y->value.number;
     }
 
     if (strcmp(op, "*") == 0) {
-      x->value.num *= y->value.num;
+      x->value.number *= y->value.number;
     }
 
     if (strcmp(op, "^") == 0) {
-      x->value.num = pow(x->value.num, y->value.num);
+      x->value.number = pow(x->value.number, y->value.number);
     }
 
     if (strcmp(op, "/") == 0) {
-      if (y->value.num == 0) {
+      if (y->value.number == 0) {
         lval_destroy(x);
         lval_destroy(y);
         x = lval_err("division by zero!");
         break;
       }
-      x->value.num /= y->value.num;
+      x->value.number /= y->value.number;
     }
 
     if (strcmp(op, "%") == 0) {
-      if (y->value.num == 0) {
+      if (y->value.number == 0) {
         lval_destroy(x);
         lval_destroy(y);
         x = lval_err("division by zero!");
         break;
       }
-      x->value.num = x->value.num % y->value.num;
+      x->value.number = x->value.number % y->value.number;
     }
 
     lval_destroy(y);
@@ -277,22 +290,22 @@ lval_t* builtin_op(lval_t* v, char* op) {
 }
 
 lval_t* lval_eval_sexpr(lval_t* v) {
-  for (int i = 0; i < v->value.cellw.count; i++) {
-    v->value.cellw.cell[i] = lval_eval(v->value.cellw.cell[i]);
+  for (int i = 0; i < v->value.cell.count; i++) {
+    v->value.cell.values[i] = lval_eval(v->value.cell.values[i]);
   }
 
   // Checking errors
-  for (int i = 0; i < v->value.cellw.count; i++) {
-    if (v->value.cellw.cell[i]->type == LVAL_ERR) {
+  for (int i = 0; i < v->value.cell.count; i++) {
+    if (v->value.cell.values[i]->type == LVAL_ERR) {
       return lval_take(v, i);
     }
   }
 
-  if (v->value.cellw.count == 0) {
+  if (v->value.cell.count == 0) {
     return v;
   }
 
-  if (v->value.cellw.count == 1) {
+  if (v->value.cell.count == 1) {
     return lval_take(v, 0);
   }
 
@@ -304,7 +317,7 @@ lval_t* lval_eval_sexpr(lval_t* v) {
     return lval_err("S-expression does not start with symbol");
   }
 
-  lval_t* result = builtin(v, first->value.sym);
+  lval_t* result = builtin(v, first->value.symbol);
   lval_destroy(first);
   return result;
 };
@@ -316,15 +329,15 @@ lval_t* lval_eval_sexpr(lval_t* v) {
   }
 
 lval_t* builtin_head(lval_t* v) {
-  LASSERT(v->value.cellw.count == 1, v, "Function head requires 1 argument");
-  LASSERT(v->value.cellw.cell[0]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 1, v, "Function head requires 1 argument");
+  LASSERT(v->value.cell.values[0]->type == LVAL_QEXPR, v,
           "Function head requires a qexpr, incorrect type");
-  LASSERT(v->value.cellw.cell[0]->value.cellw.count > 0, v,
+  LASSERT(v->value.cell.values[0]->value.cell.count > 0, v,
           "Function head requires a non-empty qexpr");
 
   lval_t* head = lval_take(v, 0);
 
-  while (head->value.cellw.count > 1) {
+  while (head->value.cell.count > 1) {
     lval_destroy(lval_pop(head, 1));
   }
 
@@ -332,10 +345,10 @@ lval_t* builtin_head(lval_t* v) {
 }
 
 lval_t* builtin_tail(lval_t* v) {
-  LASSERT(v->value.cellw.count == 1, v, "Function tail requires 1 argument");
-  LASSERT(v->value.cellw.cell[0]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 1, v, "Function tail requires 1 argument");
+  LASSERT(v->value.cell.values[0]->type == LVAL_QEXPR, v,
           "Function tail requires a qexpr, incorrect type");
-  LASSERT(v->value.cellw.cell[0]->value.cellw.count > 0, v,
+  LASSERT(v->value.cell.values[0]->value.cell.count > 0, v,
           "Function tail requires a non-empty qexpr");
 
   lval_t* tail = lval_take(v, 0);
@@ -350,41 +363,41 @@ lval_t* builtin_list(lval_t* v) {
 }
 
 lval_t* builtin_cons(lval_t* v) {
-  LASSERT(v->value.cellw.count == 2, v, "Function cons requires 2 arguments");
-  LASSERT(v->value.cellw.cell[1]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 2, v, "Function cons requires 2 arguments");
+  LASSERT(v->value.cell.values[1]->type == LVAL_QEXPR, v,
           "Function cons requires a qexpr as second argument, incorrect type");
 
   return lval_prepend(lval_pop(v, 1), lval_take(v, 0));
 }
 
 lval_t* builtin_len(lval_t* v) {
-  LASSERT(v->value.cellw.count == 1, v, "Function len requires 1 argument");
-  LASSERT(v->value.cellw.cell[0]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 1, v, "Function len requires 1 argument");
+  LASSERT(v->value.cell.values[0]->type == LVAL_QEXPR, v,
           "Function len requires a qexpr, incorrect type");
 
-  return lval_num(v->value.cellw.cell[0]->value.cellw.count);
+  return lval_num(v->value.cell.values[0]->value.cell.count);
 }
 
 lval_t* builtin_init(lval_t* v) {
-  LASSERT(v->value.cellw.count == 1, v, "Function init requires 1 argument");
-  LASSERT(v->value.cellw.cell[0]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 1, v, "Function init requires 1 argument");
+  LASSERT(v->value.cell.values[0]->type == LVAL_QEXPR, v,
           "Function init requires a qexpr, incorrect type");
-  LASSERT(v->value.cellw.cell[0]->value.cellw.count > 0, v,
+  LASSERT(v->value.cell.values[0]->value.cell.count > 0, v,
           "Function init requires a non-empty qexpr");
 
   lval_t* list = lval_take(v, 0);
 
-  list->value.cellw.count--;
-  lval_destroy(list->value.cellw.cell[list->value.cellw.count]);
-  list->value.cellw.cell = realloc(list->value.cellw.cell,
-                                   sizeof(lval_t*) * list->value.cellw.count);
+  list->value.cell.count--;
+  lval_destroy(list->value.cell.values[list->value.cell.count]);
+  list->value.cell.values = realloc(list->value.cell.values,
+                                    sizeof(lval_t*) * list->value.cell.count);
 
   return list;
 }
 
 lval_t* builtin_eval(lval_t* v) {
-  LASSERT(v->value.cellw.count == 1, v, "Function eval requires 1 argument");
-  LASSERT(v->value.cellw.cell[0]->type == LVAL_QEXPR, v,
+  LASSERT(v->value.cell.count == 1, v, "Function eval requires 1 argument");
+  LASSERT(v->value.cell.values[0]->type == LVAL_QEXPR, v,
           "Function eval requires a qexpr, incorrect type");
 
   lval_t* x = lval_take(v, 0);
@@ -393,7 +406,7 @@ lval_t* builtin_eval(lval_t* v) {
 }
 
 lval_t* lval_join(lval_t* x, lval_t* y) {
-  while (y->value.cellw.count) {
+  while (y->value.cell.count) {
     x = lval_add(x, lval_pop(y, 0));
   }
 
@@ -402,14 +415,14 @@ lval_t* lval_join(lval_t* x, lval_t* y) {
 }
 
 lval_t* builtin_join(lval_t* v) {
-  for (int i = 0; i < v->value.cellw.count; i++) {
-    LASSERT(v->value.cellw.cell[i]->type == LVAL_QEXPR, v,
+  for (int i = 0; i < v->value.cell.count; i++) {
+    LASSERT(v->value.cell.values[i]->type == LVAL_QEXPR, v,
             "Function join requires a qexpr, incorrect type");
   }
 
   lval_t* x = lval_pop(v, 0);
 
-  while (v->value.cellw.count > 0) {
+  while (v->value.cell.count > 0) {
     x = lval_join(x, lval_pop(v, 0));
   }
 
@@ -447,4 +460,40 @@ lval_t* builtin(lval_t* v, char* fun) {
 
   lval_destroy(v);
   return lval_err("function not implemented");
+}
+
+lval_t* lval_copy(lval_t* v) {
+  lval_t* x = (lval_t*)malloc(sizeof(lval_t));
+  x->type = v->type;
+
+  switch (x->type) {
+  case LVAL_NUM:
+    x->value.number = v->value.number;
+    break;
+
+  case LVAL_FUN:
+    x->value.function = v->value.function;
+    break;
+
+  case LVAL_ERR:
+    x->value.error = (char*)malloc(strlen(v->value.error) + 1);
+    strcpy(x->value.error, v->value.error);
+    break;
+
+  case LVAL_SYM:
+    x->value.symbol = (char*)malloc(strlen(v->value.symbol) + 1);
+    strcpy(x->value.symbol, v->value.symbol);
+    break;
+
+  case LVAL_SEXPR:
+  case LVAL_QEXPR:
+    x->value.cell.count = v->value.cell.count;
+    x->value.cell.values = malloc(sizeof(lval_t*) * x->value.cell.count);
+    for (int i = 0; i < x->value.cell.count; i++) {
+      x->value.cell.values[i] = lval_copy(v->value.cell.values[i]);
+    }
+    break;
+  }
+
+  return x;
 }
